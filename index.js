@@ -20,7 +20,6 @@ app.options("*", cors(corsConfig));
  */
 app.use(express.json());
 
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.yi4wr.mongodb.net/?retryWrites=true&w=majority`;
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.peevkv3.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   // useNewUrlParser: true,
@@ -47,6 +46,7 @@ const run = async () => {
 
     const usersCollection = dataBase.collection("users");
     const allBooksCollection = dataBase.collection("allBooks");
+    const reviewsCollection = dataBase.collection("reviews");
 
     // For register new user
     app.post("/signup", async (req, res) => {
@@ -80,7 +80,6 @@ const run = async () => {
           return res.status(404).send({ message: "User not found" });
         }
 
-        // Compare provided password with the stored hashed password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
           return res.status(401).send({ message: "Invalid credentials" });
@@ -130,6 +129,27 @@ const run = async () => {
       const result = await allBooksCollection.deleteOne({
         _id: new ObjectId(id),
       });
+
+      res.send(result);
+    });
+
+    app.get("/reviews/:id", async (req, res) => {
+      const id = req.params.id;
+      const reviews = await reviewsCollection.find({ bookId: id }).toArray();
+      await Promise.all(
+        reviews.map(async (review) => {
+          const user = await usersCollection.findOne({
+            _id: new ObjectId(review.userId),
+          });
+          review.user = user;
+          return review;
+        })
+      );
+      res.send(reviews);
+    });
+    app.post("/review", async (req, res) => {
+      const review = req.body;
+      const result = await reviewsCollection.insertOne(review);
 
       res.send(result);
     });
